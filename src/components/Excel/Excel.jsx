@@ -9,15 +9,24 @@ function clone(o) {
 class Excel extends Component {
     constructor(props) {
         super()
+        const data = clone(props.initialData).map((row, idx) => {
+            row.push(idx)
+            return row
+        })
         this.state = {
-            data: props.initialData,
+            data,
             sortby: null,
             descending: false,
-            edit: null
+            edit: null,
+            search: false
         }
+
+        this.preSearchData = null
         this.sort = this.sort.bind(this)
         this.showEditor = this.showEditor.bind(this)
         this.save = this.save.bind(this)
+        this.toggleSearch = this.toggleSearch.bind(this)
+        this.search = this.search.bind(this)
     }
     save(e) {
         e.preventDefault()
@@ -60,41 +69,91 @@ class Excel extends Component {
             descending
         })
     }
+    toggleSearch() {
+        if (this.state.search) {
+            this.setState({
+                data: this.preSearchData,
+                search: false
+            })
+            this.preSearchData = null
+        } else {
+            this.preSearchData = this.state.data
+            this.setState({
+                search: true
+            })
+        }
+    }
+    search(e) {
+        const needle = e.target.value.toLowerCase()
+        if (!needle) {
+            this.setState({ data: this.preSearchData })
+            return
+        }
+        const idx = e.target.dataset.idx
+        const searchdata = this.preSearchData.filter((row) => {
+            return row[idx].toString().toLowerCase().indexOf(needle) > -1
+        })
+        this.setState({ data: searchdata })
+    }
     render() {
+
+        const searchRow = !this.state.search ? null : (
+            <tr onChange={this.search}>
+                {this.props.headers.map((_, idx) => (
+                    <td key={idx}>
+                        <input type="text" data-idx={idx} />
+                    </td>
+                ))}
+            </tr>
+        )
+
         return (
-            <table className='table'>
+            <div>
+                <button className='toolbar' onClick={this.toggleSearch}>
+                    {this.state.search ? 'Hide search' : 'Show search'}
+                </button>
+                <table className='table'>
 
-                <thead onClick={this.sort}>
-                    <tr>
-                        {this.props.headers.map((title, idx) => {
-                            if (this.props.sortby === idx) {
-                                title += this.state.descending ? "\u2191" : "\u2193"
-                            }
-                            return <th key={idx}>{title}</th>
-                        })}
-                    </tr>
-                </thead>
-
-                <tbody onDoubleClick={this.showEditor}>
-                    {this.state.data.map((row, rowidx) => (
-                        <tr key={rowidx} data-row={rowidx}>
-                            {row.map((cell, columnidx) => {
-                                const edit = this.state.edit
-
-                                if (edit && edit.row === rowidx && edit.column === columnidx) {
-                                    cell = (
-                                        <form onSubmit={this.save}>
-                                            <input type="text" defaultValue={cell} />
-                                        </form>
-                                    )
+                    <thead onClick={this.sort}>
+                        <tr>
+                            {this.props.headers.map((title, idx) => {
+                                if (this.props.sortby === idx) {
+                                    title += this.state.descending ? "\u2191" : "\u2193"
                                 }
-                                return <td key={columnidx}>{cell}</td>
+                                return <th key={idx}>{title}</th>
                             })}
                         </tr>
-                    ))}
-                </tbody>
+                    </thead>
 
-            </table>
+                    <tbody onDoubleClick={this.showEditor}>
+                        {searchRow}
+                        {this.state.data.map((row, rowidx) => {
+                            const recordId = row[row.lenght - 1]
+                            return (
+                                <tr key={recordId} data-row={recordId}>
+                                    {row.map((cell, columnidx) => {
+                                        if (columnidx === this.props.headers.lenght) {
+                                            return
+                                        }
+
+                                        const edit = this.state.edit
+                                        if (edit && edit.row === recordId && edit.column === columnidx) {
+                                            cell = (
+                                                <form onSubmit={this.save}>
+                                                    <input type="text" defaultValue={cell} />
+                                                </form>
+                                            )
+                                        }
+                                        return <td key={columnidx}>{cell}</td>
+                                    })}
+                                </tr>
+                            )
+                        })}
+                    </tbody>
+
+                </table>
+            </div>
+
         );
     }
 }
